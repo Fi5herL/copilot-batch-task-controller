@@ -550,8 +550,9 @@
             if (!hovered) return;
             const node = hovered.cloneNode(true);
             node.classList.remove('cbtc-pick-highlight');
-            if (!node.className) node.removeAttribute('class');
+            if (!node.getAttribute('class')) node.removeAttribute('class');
             let html = node.outerHTML || '';
+            // 依字元截斷供 Prompt 使用，可能不是完整 DOM 片段，但可避免超長貼入
             if (html.length > HTML_CAPTURE_MAX_LENGTH) html = html.substring(0, HTML_CAPTURE_MAX_LENGTH);
             cleanup();
             sendCaptureToCopilot(formatHtmlCapture(html));
