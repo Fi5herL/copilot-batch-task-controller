@@ -245,10 +245,6 @@
         }
         if (tasks.length === 0) { alert('請至少在一個分頁輸入任務'); return; }
 
-        if (tasks.length > 5) {
-            if (!confirm(`警告：開啟 ${tasks.length} 個分頁可能觸發速率限制。\n仍要繼續嗎？`)) return;
-        }
-
         GM_setValue('batch_tasks', tasks);
         GM_setValue('batch_status', tasks.map(t => ({
             ...t, status: 'waiting', message: '等待中', time: null
@@ -542,7 +538,7 @@
             let html = node.outerHTML || '';
             if (html.length > 8000) html = html.substring(0, 8000);
             cleanup();
-            sendCaptureToCopilot(`以下是截取的 HTML 區塊：\n\`\`\`html\n\n${html}\n\`\`\``);
+            sendCaptureToCopilot(formatHtmlCapture(html));
         };
 
         const onKeyDown = e => {
@@ -565,6 +561,10 @@
         GM_setValue('pending_capture', text);
         GM_openInTab('https://m365.cloud.microsoft/', { active: true });
         alert(`已截取 ${text.length} 字，正在開啟 Copilot 頁面…\n請在面板選擇要貼入的分頁（T1～T5）`);
+    }
+
+    function formatHtmlCapture(html) {
+        return ['以下是截取的 HTML 區塊：', '```html', '', html, '```'].join('\n');
     }
 
 })();
