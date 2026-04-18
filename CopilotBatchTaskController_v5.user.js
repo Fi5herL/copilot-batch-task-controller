@@ -582,8 +582,10 @@
     //  子分頁模式
     // ══════════════════════════════════════════════
     function initSlaveMode() {
-        const raw = new URLSearchParams(location.search).get('batch_task')
-            ?? sessionStorage.getItem('cbtc_batch_task');
+        const params = new URLSearchParams(location.search);
+        const raw = params.get('batch_task') ?? sessionStorage.getItem('cbtc_batch_task');
+        const isInitialLoad = params.get('batch_task') !== null;
+        const autoSubmit = (params.get('auto_submit') ?? sessionStorage.getItem('cbtc_auto_submit') ?? '1') !== '0';
         const tabIndex = parseInt(raw, 10);
         if (!Number.isInteger(tabIndex)) return;
         const tasks    = GM_getValue('batch_tasks', []);
@@ -591,7 +593,7 @@
         setupAutoTabSync(tabIndex);
         startConversationIdPoll(tabIndex);
         if (entry) document.title = `[T${tabIndex+1}] ${entry.task.substring(0,20)}...`;
-        if (entry && urlBatchTask !== null) {
+        if (entry && isInitialLoad && autoSubmit) {
             setTimeout(() => executeTask(entry.task, tabIndex), 4000);
         }
     }
