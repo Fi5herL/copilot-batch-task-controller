@@ -22,6 +22,10 @@
     const TABS = 5;
     const PANEL_STATE_KEY = 'panelState';
     const HTML_CAPTURE_MAX_LENGTH = 8000;
+    const PAGE_TEXT_MAX_LENGTH = 6000;
+    const MAX_DISPLAYED_LOGS = 6;
+    const TAB_OPEN_DELAY_MS = 2500;
+    const MAX_CONV_ID_POLL_ATTEMPTS = 240;
     let htmlPickActive = false;
     let focusedSlot = 0;
     let panelState = GM_getValue(PANEL_STATE_KEY, 'full');
@@ -433,6 +437,11 @@
         GM_setValue('execLog', [...log, ...items]);
     }
 
+    function getDisplaySlot(entry) {
+        if (Number.isInteger(entry?.tabIndex)) return entry.tabIndex + 1;
+        return Number(entry?.slot) || 0;
+    }
+
     function refreshExecutionLog() {
         const log = GM_getValue('execLog', []);
         const count = document.getElementById('cbtc-log-count');
@@ -443,13 +452,14 @@
             list.innerHTML = '<div style="opacity:.65;font-size:12px;padding:6px 2px">尚無執行紀錄</div>';
             return;
         }
-        const rows = log.map((entry, idx) => ({ entry, idx })).reverse().slice(0, 6);
+        const rows = log.map((entry, idx) => ({ entry, idx })).reverse().slice(0, MAX_DISPLAYED_LOGS);
         list.innerHTML = rows.map(({entry, idx}) => {
             const prompt = String(entry.prompt || '').replace(/\s+/g, ' ').trim();
             const preview = prompt.length > 38 ? `${prompt.substring(0, 38)}...` : prompt;
+            const displaySlot = getDisplaySlot(entry);
             return `<button class="cbtc-log-row" data-index="${idx}">
                 <div style="display:flex;justify-content:space-between;gap:10px;align-items:center">
-                    <span style="font-weight:700">T${entry.slot}</span>
+                    <span style="font-weight:700">T${displaySlot}</span>
                     <span style="opacity:.8">${escapeHtml(entry.status || '')}</span>
                 </div>
                 <div style="opacity:.9;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(preview)}</div>
@@ -461,13 +471,14 @@
         const log = GM_getValue('execLog', []);
         const item = log[index];
         if (!item) return;
+        const displaySlot = getDisplaySlot(item);
         const panel = document.getElementById('cbtc-panel');
         const detail = document.getElementById('cbtc-log-detail');
         if (!panel || !detail) return;
         panel.classList.add('log-expanded');
         detail.style.display = '';
         detail.innerHTML = [
-            `<div style="font-weight:700;margin-bottom:8px">T${item.slot} · ${escapeHtml(item.status || '')}</div>`,
+            `<div style="font-weight:700;margin-bottom:8px">T${displaySlot} · ${escapeHtml(item.status || '')}</div>`,
             `<div style="opacity:.75;margin-bottom:8px">${escapeHtml(item.submittedAt || '')}</div>`,
             `<div>${escapeHtml(item.prompt || '')}</div>`
         ].join('');
@@ -495,9 +506,9 @@
 
     function updateExecutionLogStatus(tabIndex, status) {
         const log = GM_getValue('execLog', []);
-        const slot = tabIndex + 1;
+        const displaySlot = tabIndex + 1;
         for (let i = log.length - 1; i >= 0; i--) {
-            if (log[i].slot === slot) {
+            if (log[i].tabIndex === tabIndex || log[i].slot === displaySlot) {
                 log[i].status = status;
                 break;
             }
@@ -523,6 +534,7 @@
             ...t, status: 'waiting', message: '等待中', time: null
         })));
         appendExecutionLog(tasks.map(t => ({
+            tabIndex: t.tabIndex,
             slot: t.tabIndex + 1,
             prompt: t.task,
             submittedAt: new Date().toISOString(),
@@ -560,7 +572,7 @@
                 setSlotPending(tabIndex);
                 GM_openInTab(`https://m365.cloud.microsoft/?batch_task=${tabIndex}&auto_submit=1`, { active: false });
                 updateTaskStatus(tabIndex, 'running', '分頁已開啟，等待載入...');
-            }, j * 2500);
+            }, j * TAB_OPEN_DELAY_MS);
         }
 
         GM_notification({ title: '批次任務已啟動', text: `共 ${tasks.length} 個任務`, timeout: 3000 });
@@ -592,11 +604,16 @@
     }
 
     function startConversationIdPoll(tabIndex) {
+        let attempts = 0;
         const timer = setInterval(() => {
+            attempts++;
             const m = location.href.match(/\/conversation\/([0-9a-f-]{36})/i);
-            if (!m) return;
-            clearInterval(timer);
-            GM_setValue('slot_register', { slot: tabIndex, convId: m[1], ts: Date.now() });
+            if (m) {
+                clearInterval(timer);
+                GM_setValue('slot_register', { slot: tabIndex, convId: m[1], ts: Date.now() });
+                return;
+            }
+            if (attempts >= MAX_CONV_ID_POLL_ATTEMPTS) clearInterval(timer);
         }, 500);
     }
 
@@ -874,9 +891,10 @@
             if (!hovered) return;
             const node = hovered.cloneNode(true);
             node.classList.remove('cbtc-pick-highlight');
+            // 維持輸出乾淨，避免序列化出 class=""
             if (!node.getAttribute('class')) node.removeAttribute('class');
             let html = node.outerHTML || '';
-            // 依字元截斷供 Prompt 使用，可能不是完整 DOM 片段，但可避免超長貼入
+            // 依字元截斷供 Prompt 使用（可能不是完整 DOM 片段），刻意以長度限制優先，避免提示詞過長
             if (html.length > HTML_CAPTURE_MAX_LENGTH) html = html.substring(0, HTML_CAPTURE_MAX_LENGTH);
             cleanup();
             sendCaptureToCopilot(formatHtmlCapture(html));
@@ -895,7 +913,7 @@
         const clone = document.body.cloneNode(true);
         clone.querySelectorAll('script,style,nav,header,footer,aside,[aria-hidden="true"]')
              .forEach(el => el.remove());
-        return clone.innerText.replace(/\n{3,}/g, '\n\n').trim().substring(0, 6000);
+        return clone.innerText.replace(/\n{3,}/g, '\n\n').trim().substring(0, PAGE_TEXT_MAX_LENGTH);
     }
 
     function sendCaptureToCopilot(text) {
