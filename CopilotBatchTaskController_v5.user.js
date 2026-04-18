@@ -19,7 +19,7 @@
     const isCopilotPage = /m365\.cloud\.microsoft|copilot\.microsoft\.com|bing\.com\/chat/.test(location.href);
     const urlParams = new URLSearchParams(location.search);
     const urlBatchTask = urlParams.get('batch_task');
-    if (urlBatchTask !== null) {
+    if (isCopilotPage && urlBatchTask !== null) {
         sessionStorage.setItem('cbtc_batch_task', urlBatchTask);
         sessionStorage.setItem('cbtc_auto_submit', urlParams.get('auto_submit') || '0');
     }
@@ -585,7 +585,7 @@
         const params = new URLSearchParams(location.search);
         const raw = params.get('batch_task') ?? sessionStorage.getItem('cbtc_batch_task');
         const isInitialLoad = params.get('batch_task') !== null;
-        const autoSubmit = (params.get('auto_submit') ?? sessionStorage.getItem('cbtc_auto_submit') ?? '1') !== '0';
+        const autoSubmit = (params.get('auto_submit') ?? sessionStorage.getItem('cbtc_auto_submit') ?? '0') !== '0';
         const tabIndex = parseInt(raw, 10);
         if (!Number.isInteger(tabIndex)) return;
         const tasks    = GM_getValue('batch_tasks', []);
