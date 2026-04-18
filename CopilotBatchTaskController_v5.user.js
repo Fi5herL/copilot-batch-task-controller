@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Copilot Batch Task Controller v5
 // @namespace    http://tampermonkey.net/
-// @version      5.0
-// @description  批次 Copilot 任務控制器：三段式收合 + 分頁同步 + 執行紀錄 + 對話映射
+// @version      5.1
+// @description  批次 Copilot 任務控制器：三段式收合 + 分頁同步 + 執行紀錄 + 對話映射 + 跨重導向分頁識別
 // @author       Fi5herL
 // @match        *://*/*
 // @grant        GM_openInTab
@@ -17,7 +17,13 @@
     'use strict';
 
     const isCopilotPage = /m365\.cloud\.microsoft|copilot\.microsoft\.com|bing\.com\/chat/.test(location.href);
-    const isSlavePage   = location.href.includes('batch_task=');
+    const urlParams = new URLSearchParams(location.search);
+    const urlBatchTask = urlParams.get('batch_task');
+    if (isCopilotPage && urlBatchTask !== null) {
+        sessionStorage.setItem('cbtc_batch_task', urlBatchTask);
+        sessionStorage.setItem('cbtc_auto_submit', urlParams.get('auto_submit') || '0');
+    }
+    const isSlavePage   = urlBatchTask !== null || sessionStorage.getItem('cbtc_batch_task') !== null;
     const CHANNEL_NAME = 'copilot-batch-ctrl';
     const TABS = 5;
     const PANEL_STATE_KEY = 'panelState';
@@ -325,18 +331,12 @@
         #cbtc-rail-dots {
             width:100%;height:100%;display:flex;flex-direction:column;
             align-items:center;justify-content:space-evenly;
-            animation:cbtc-rail-spin 6s linear infinite;
-            transform-origin:center;
         }
         .cbtc-rail-dot {
             width:20px;height:20px;border-radius:50%;font-size:9px;font-weight:700;
             border:2px solid rgba(255,255,255,.2);display:flex;
             align-items:center;justify-content:center;color:#fff;
             background:rgba(255,255,255,.14);
-        }
-        @keyframes cbtc-rail-spin {
-            from { transform:rotate(0deg); }
-            to { transform:rotate(360deg); }
         }
         `;
         document.head.appendChild(s);
@@ -582,15 +582,20 @@
     //  子分頁模式
     // ══════════════════════════════════════════════
     function initSlaveMode() {
-        const tabIndex = parseInt(new URLSearchParams(location.search).get('batch_task'), 10);
+        const params = new URLSearchParams(location.search);
+        const raw = params.get('batch_task') ?? sessionStorage.getItem('cbtc_batch_task');
+        const isInitialLoad = params.get('batch_task') !== null;
+        const autoSubmit = (params.get('auto_submit') ?? sessionStorage.getItem('cbtc_auto_submit') ?? '0') !== '0';
+        const tabIndex = parseInt(raw, 10);
         if (!Number.isInteger(tabIndex)) return;
         const tasks    = GM_getValue('batch_tasks', []);
         const entry    = tasks.find(t => t.tabIndex === tabIndex);
         setupAutoTabSync(tabIndex);
         startConversationIdPoll(tabIndex);
-        if (!entry) return;
-        document.title = `[T${tabIndex+1}] ${entry.task.substring(0,20)}...`;
-        setTimeout(() => executeTask(entry.task, tabIndex), 4000);
+        if (entry) document.title = `[T${tabIndex+1}] ${entry.task.substring(0,20)}...`;
+        if (entry && isInitialLoad && autoSubmit) {
+            setTimeout(() => executeTask(entry.task, tabIndex), 4000);
+        }
     }
 
     function setupAutoTabSync(tabIndex) {
