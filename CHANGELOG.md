@@ -1,5 +1,18 @@
 # Changelog
 
+## [5.0] - 2026-04-18
+
+### 新增
+- **三段式收合**：`full -> bar -> rail -> full`，新增 28px 右側 Rail 並以 `panelState` 記憶狀態
+- **Auto Tab Sync**：子分頁於 focus / visibilitychange 透過 `BroadcastChannel('copilot-batch-ctrl')` 廣播 `tabFocused`，主控自動切換對應 T 分頁
+- **執行紀錄區**：送出任務後清空輸入框並寫入 `execLog`（slot / prompt / submittedAt / status），面板底部顯示可展開明細，點列加寬到 520px，`Esc` 可收合
+- **Conversation ID Mapping**：主控開分頁前先寫入 `slot_pending_N`，子分頁每 500ms 輪詢 URL 擷取 conversation UUID 後回寫 `slot_register`
+
+### 調整
+- T1～T5 狀態色改為：灰（未分配）/ 黃（pending）/ 藍（generating）/ 綠（done）/ 青色外框（focused）
+
+---
+
 ## [4.0] - 2026-04-18
 
 ### 新增
