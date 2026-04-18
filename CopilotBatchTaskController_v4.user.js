@@ -18,6 +18,7 @@
 
     const isCopilotPage = /m365\.cloud\.microsoft|copilot\.microsoft\.com|bing\.com\/chat/.test(location.href);
     const isSlavePage   = location.href.includes('batch_task=');
+    const HTML_CAPTURE_MAX_LENGTH = 8000;
     let htmlPickActive = false;
 
     initMasterUI();
@@ -438,18 +439,33 @@
         GM_setValue('pending_capture', '');
         const notice = document.getElementById('cbtc-capture-notice');
         if (!notice) return;
-        const btns = Array.from({length:5}, (_,i) =>
-            `<button onclick="(function(){
-                var el=document.getElementById('task-list-${i}');
-                if(el){el.value+=(el.value?'\n':'')+decodeURIComponent('${encodeURIComponent(content)}');
-                el.dispatchEvent(new Event('input'));}
-                document.getElementById('cbtc-capture-notice').style.display='none';
-            })()" style="margin:2px 3px;padding:3px 9px;border-radius:6px;border:none;background:rgba(0,210,255,.3);color:#fff;cursor:pointer;font-size:12px">T${i+1}</button>`
-        ).join('');
         notice.style.display = '';
-        notice.innerHTML = `📋 <b>已截取網頁內容</b>（${content.length} 字）貼入：${btns}
-            <button onclick="this.parentElement.style.display='none'"
-                style="margin:2px 3px;padding:3px 9px;border-radius:6px;border:none;background:rgba(255,71,87,.3);color:#fff;cursor:pointer;font-size:12px">✕</button>`;
+        notice.textContent = '';
+
+        const label = document.createElement('span');
+        label.innerHTML = `📋 <b>已截取網頁內容</b>（${content.length} 字）貼入：`;
+        notice.appendChild(label);
+
+        for (let i = 0; i < 5; i++) {
+            const btn = document.createElement('button');
+            btn.textContent = `T${i+1}`;
+            btn.style.cssText = 'margin:2px 3px;padding:3px 9px;border-radius:6px;border:none;background:rgba(0,210,255,.3);color:#fff;cursor:pointer;font-size:12px';
+            btn.addEventListener('click', () => {
+                const el = document.getElementById(`task-list-${i}`);
+                if (el) {
+                    el.value += (el.value ? '\n' : '') + content;
+                    el.dispatchEvent(new Event('input'));
+                }
+                notice.style.display = 'none';
+            });
+            notice.appendChild(btn);
+        }
+
+        const close = document.createElement('button');
+        close.textContent = '✕';
+        close.style.cssText = 'margin:2px 3px;padding:3px 9px;border-radius:6px;border:none;background:rgba(255,71,87,.3);color:#fff;cursor:pointer;font-size:12px';
+        close.addEventListener('click', () => notice.style.display = 'none');
+        notice.appendChild(close);
     }
 
     function initCaptureMenu() {
@@ -536,7 +552,7 @@
             node.classList.remove('cbtc-pick-highlight');
             if (!node.className) node.removeAttribute('class');
             let html = node.outerHTML || '';
-            if (html.length > 8000) html = html.substring(0, 8000);
+            if (html.length > HTML_CAPTURE_MAX_LENGTH) html = html.substring(0, HTML_CAPTURE_MAX_LENGTH);
             cleanup();
             sendCaptureToCopilot(formatHtmlCapture(html));
         };
