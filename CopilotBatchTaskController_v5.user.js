@@ -121,7 +121,7 @@
         if (!panel || !bar || !rail) return;
         panel.style.display = state === 'full' ? '' : 'none';
         bar.style.display   = state === 'bar' ? '' : 'none';
-        rail.style.display  = state === 'rail' ? '' : 'none';
+        rail.style.display  = state === 'rail' ? 'flex' : 'none';
     }
 
     function buildPanelHTML(n) {
