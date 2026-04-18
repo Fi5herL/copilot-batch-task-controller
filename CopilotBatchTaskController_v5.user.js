@@ -590,11 +590,9 @@
         const entry    = tasks.find(t => t.tabIndex === tabIndex);
         setupAutoTabSync(tabIndex);
         startConversationIdPoll(tabIndex);
+        if (entry) document.title = `[T${tabIndex+1}] ${entry.task.substring(0,20)}...`;
         if (entry && urlBatchTask !== null) {
-            document.title = `[T${tabIndex+1}] ${entry.task.substring(0,20)}...`;
             setTimeout(() => executeTask(entry.task, tabIndex), 4000);
-        } else if (entry) {
-            document.title = `[T${tabIndex+1}] ${entry.task.substring(0,20)}...`;
         }
     }
 
